@@ -1,0 +1,66 @@
+# read in the count files and the coldata file
+library(readr)
+
+count_file1 <- read_csv('fc_MQ_PPGL13.csv')
+count_file2 <- read_csv('fc_counts_MQ_batch3.csv')
+count_file3 <- read_csv('fc_counts_MQ_Jun.csv')
+coldata_file <- read_csv('coldata.csv')
+
+# combine the files to make a bulk counts file for the deseq2 analysis
+bc1 <- left_join(count_file1, count_file2, by = "gene_code")
+bc <- left_join(bc1, count_file3, by = "gene_code")
+
+# convert count file into matrix, excluding the first column as this contains the gene names
+bulk_counts_1 <- as.matrix(bc[-1], header = TRUE)
+
+# add row names to the counts matrix
+rownames(bulk_counts_1) <- bc$Gene.name
+
+#extract the group names from the coldata file and make into data frame
+coldata_new <- as.data.frame(coldata_file$group)
+
+#set the column name of the coldata data frame to group
+colnames(coldata) <- "group"
+
+# set row names in col data
+rownames(coldata) <- coldata_file$source_name
+
+#need to design the formula - defining it by groups
+design_formula <- "~group"
+# design formula which takes batch into account example
+design_formula_1 <- "~batch+group"
+# both formulas used depending on which analysis was occuring
+
+# DESEQ data set object made using the count matrix, coldata file and the design formula
+dds_1 <- DESeqDataSetFromMatrix(countData = bulk_counts_1,
+                              colData = coldata_new,
+                              design = as.formula(design_formula))
+# check the contents of the dds object
+print(dds_1)
+
+# remove genes which have counts less than 1
+dds_1 <- dds_1[ rowSums(DESeq2::counts(dds_1)) > 1, ]
+
+# do the deseq 
+dds_1 <- DESeq(dds_1)
+
+# generate the results for the contrast between sdhd and sdhb tumour types
+DEresults_1 = results(dds_1, contrast = c("group", "SDHB", "SDHD"))
+
+# want to sort results by increasing p-value
+DEresults_1 <- DEresults_1[order(DEresults_1$pvalue),]
+
+print(DEresults_1)
+
+# use the rlog function to log transform the dds_1 object in order to perform a PCA
+pca_object_1 <- rlog(dds_1)
+# use the plotPCA function to generate a PCA plot
+DESeq2::plotPCA(pca_object_1, ntop = 500, intgroup = 'group') + theme_bw() +geom_point(size = 5)
+
+# perform a log fold change shrinkage on the dds object 
+res2 <- lfcShrink(dds_1, contrast = c('group', 'SDHD', 'SDHB' ), DEresults_1=res2, type = 'normal')
+# generate a volcano plot to find the significantly differentially expressed genes
+EnhancedVolcano(res2, lab = rownames(res2), x = 'log2FoldChange', y = 'pvalue', FCcutoff = 2)
+
+
+```
