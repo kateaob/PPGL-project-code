@@ -1,0 +1,77 @@
+# load the edgeR and AnnotationHub libraries
+library(edgeR)
+library(AnnotationHub)
+
+# read in the count files and the coldata file
+library(readr)
+
+count_file1 <- read_csv('fc_MQ_PPGL13.csv')
+count_file2 <- read_csv('fc_counts_MQ_batch3.csv')
+count_file3 <- read_csv('fc_counts_MQ_Jun.csv')
+coldata_file <- read_csv('coldata.csv')
+
+# combine the files to make a bulk counts file for the deseq2 analysis
+bc1 <- left_join(count_file1, count_file2, by = "gene_code")
+tpm_all_samples_names <- left_join(bc1, count_file3, by = "gene_code")
+
+# acess the biological annotations resources available 
+hub <- AnnotationHub()
+
+# find the biological annotation data set for humans with the ensemble database
+query(hub, c("homo sapiens","ensdb"))
+
+# acess the most recent record nand store it in a new object
+ensdb <- hub[["AH89426"]]
+
+# extract the anmes of the genes
+genes_en <- genes(ensdb)
+
+# extract the gene widths for each gene
+gnwid <- setNames(width(genes_en), names(genes_en))
+
+# calculate the rpkm for all samples using the rpkm() function
+rpkm_all_samples <- rpkm(tpm_all_samples_names[, -1], gene.length = gnwid)
+colSums(rpkm_all_samples)
+
+# calculate the tpkm from the rpkm
+tpm_all_samples <- apply(rpkm_all_samples, 2, function(x) x / sum(as.numeric(x)) * 10^6) %>% as.data.frame()
+colSums(tpm_all_samples)
+
+# set the row names of the tpm_all_samples data frame to the gene names
+row_names1 <- tpm_all_samples_names$Gene.name
+row.names(tpm_all_samples) <- row_names1
+
+# calculate varaince of TPM for each sample across each gene
+var_all_samples_tpm <- apply(tpm_all_samples, 1, var)
+names(var_all_samples_tpm) = tpm_all_samples_names$Gene.name
+
+# extract the anmes of 500 genes with the most variance
+selected_genes_all_samples_tpm <- names(var_all_samples_tpm[order(var_all_samples_tpm, decreasing = T)][1:500])
+
+# generate a matrix with the top 500 variable genes and trasnpose this matrix for downstream analysis
+m_sel_all_tpm <- t(tpm_all_samples[rownames(tpm_all_samples) %in% selected_genes_all_samples_tpm, ])
+
+# log2 transform the values in the matrix
+m_sel_all_tpm <- log2(m_sel_all_tpm + 1)
+
+# perform PCA on the matrix
+pca_results_all_tpm <- prcomp(m_sel_all_tpm)
+
+# calculate the percentage variance explained by the first two Principal Components
+var_explained_pc1 <- round(100 * pca_results_all_tpm$sdev[1]^2 / sum(pca_results_all_tpm$sdev^2), 2)
+var_explained_pc2 <- round(100 * pca_results_all_tpm$sdev[2]^2 / sum(pca_results_all_tpm$sdev^2), 2)
+
+# create a data frame which contains the information about the samples sdhx type, the PC1 and PC2 scores and the percanatge of variance explained by the first two PCs
+dtp5 <- (data.frame('Group' = coldata_new$group, 'PC1' = pca_results_all_tpm$x[, 1],
+  'PC2' = pca_results_all_tpm$x[, 2],
+  'Variance Explained PC1' = var_explained_pc1,
+  'Variance Explained PC2' = var_explained_pc2))
+
+# plot this data to visualise the PCA
+tpm_all_pca <- ggplot(data = dtp5) + 
+       geom_point(aes(x = PC1, y = PC2, col = Group), size = 5) +  labs(
+    x = paste("PC1 (", var_explained_pc3," %)"),
+    y = paste("PC2 (", var_explained_pc4," %)")
+  ) +
+  theme_minimal()
+tpm_all_pca
