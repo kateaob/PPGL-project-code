@@ -1,0 +1,51 @@
+# extract the normalised counts from the DESEQ2 object
+normalised_ffpe_fresh_raw <- counts(dds_oakey_tcga)
+
+# split the data set into two different conditions
+ffpe_samples <- normalised_ffpe_fresh[, c(20:27)]
+fresh_samples <- normalised_ffpe_fresh[, c(1:19)]
+
+# get the average for each gene
+ffpe_genes<- data.frame(genes_ffpe=rownames(ffpe_samples), Means=rowMeans(ffpe_samples+1)) # add one to the counts to prevent the generation of infinity
+fresh_genes<- data.frame(genes_fresh =rownames(fresh_samples), Means=rowMeans(fresh_samples+1)) # add one to the counts to prevent the generation of infinity
+
+# merge both data frames to do the correaltion analysis
+mean_corr <- data.frame(ffpe_genes[,c(1,2)],fresh_genes[,2])
+names(mean_corr) <- c("gene_name", "ffpe_samples","fresh_frozen_samples")
+
+#deleting NA lines
+mean_corr <- mean_corr[complete.cases(mean_corr),]
+
+#appling log10
+mean_corr <- log10 (mean_corr[, -1])
+
+# generating the correaltion plot 
+corr_plot <- ggplot(mean_corr, aes(x=fresh_samples, y=ffpe_samples)) +   
+  theme(axis.title.y=element_text(margin=margin(0,10,0,0))) +  
+  theme(axis.title.x=element_text(margin=margin(10,0,0,0))) +
+  geom_point(shape=1, alpha =0.3) +theme_bw() + 
+  geom_smooth(method=lm, formula = y~x) + # add line of best fit
+  stat_cor(method = "pearson") # add the pearson correlation coefficient
+corr_plot
+
+# perform pearson's correlation 
+cor_test_result <- cor.test(mean_corr$ffpe_samples, mean_corr$fresh_samples)
+cor_test_result
+
+# store the names of genes to highlight in an object
+gene_to_highlight <- c("ADGRV1", "ELOVL7", "DDO", "BICDL2", "ENKUR", "APOBEC2", "C1orf127", "CPS1", "GABRA1", "COCH")
+
+# make the rownames of the mean_corr data frame into a seperate column
+mean_corr$gene <- rownames(mean_corr)
+
+# generate a new grqaph with the gene names and points 
+corr_plot_vhl <- ggplot(mean_corr, aes(x=fresh_samples, y=ffpe_samples, label = gene)) +  
+  theme(axis.title.y=element_text(margin=margin(0,10,0,0))) +  
+  theme(axis.title.x=element_text(margin=margin(10,0,0,0))) +
+  geom_point(shape=1, alpha =0.3) +theme_bw() +
+  stat_cor(method = "pearson") + 
+  geom_point(color = "grey") + geom_point(data = mean_corr %>% filter(gene %in% gene_to_highlight), colour = "red") + # hihglight any point in red that is the gene found in the gene_to_highlight object
+  geom_text(data = mean_corr %>% filter( gene %in% gene_to_highlight ), color = "black")  + # add the name of the gene from the gene_to_highlight object
+  geom_smooth(method=lm, formula = y~x)
+
+corr_plot_vhl
