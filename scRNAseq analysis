@@ -1,0 +1,122 @@
+# load the required libraries
+library(dplyr)
+library(Seurat)
+library(patchwork)
+
+# read in the data
+sc.data <- Read10X(data.dir = "/Users/kateobrien/Desktop/sc0702/")
+# make the suerat object with the raw data
+sc <- CreateSeuratObject(counts = sc.data, project = "sc0702", min.cells = 3, min.features = 200)
+dim(sc)
+
+# using the percentage mt function to see how many cells have mitochindiral contamination as this can be an indication of dying cells
+sc[["percent.mt"]] <- PercentageFeatureSet(sc, pattern = "^MT-")
+
+# Visualize QC metrics as a violin plot
+qcPlots <- VlnPlot(sc, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+qcPlots
+
+# Get filtering parameters, filter any cells with features or counts which are above or below 2 times the SD of the mean
+count.max <- round(mean(sc$nCount_RNA) + 2 * sd(sc$nCount_RNA), digits = -2)
+count.min <- round(mean(sc$nCount_RNA) - 2 * sd(sc$nCount_RNA), digits = -2)
+feat.max <- round(mean(sc$nFeature_RNA) + 2 * sd(sc$nFeature_RNA), digits = -2)
+feat.min <- round(mean(sc$nFeature_RNA) - 2 * sd(sc$nFeature_RNA), digits = -2)
+
+# Set minimum parameters to 0 if negative value
+if (count.min < 0){
+   count.min <- 0
+} else {
+   count.min <- count.min
+}
+  
+if (feat.min < 0){
+   feat.min <- 0
+} else {
+   feat.min <- feat.min
+}
+
+# filter the data set using the defined parameters
+sc_filtered <- subset(sc, subset = nFeature_RNA > feat.min & nFeature_RNA < feat.max & nCount_RNA < count.max & nCount_RNA > count.min & percent.mt < 10)
+
+#normalise the data
+sc_filtered <- NormalizeData(sc_filtered, normalization.method = "LogNormalize", scale.factor = 10000)
+
+# use the findvariable features function to find the highly variable features
+sc_filtered <- FindVariableFeatures(sc_filtered, selection.method = "vst", nfeatures = 2000)
+
+# Identify the 10 most highly variable genes
+top10 <- head(VariableFeatures(sc_filtered), 10)
+
+# plot variable features with and without labels
+plot1 <- VariableFeaturePlot(sc_filtered)
+plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE)
+
+# extract gene names from sc data set and store in all.genes
+all.genes <- rownames(sc_filtered)
+# use the scaledata function to scale the expression values for genes stored in all name variable
+sc_filtered <- ScaleData(sc_filtered, features = all.genes)
+
+# use the runpca function to do a pca on the variable features gene
+sc <- RunPCA(sc_filtered, features = VariableFeatures(object = sc_filtered))
+
+# use visdimloadings to to visualize the contribution of each gene to the principal components - dims means for the first two PC and reduction indicates the visualisation should be based on the PCA
+VizDimLoadings(sc, dims = 1:2, reduction = "pca")
+VizDimLoadings(sc, dims = 3:4, reduction = "pca")
+
+# use dim plot to visualise the cells based on PCA results
+DimPlot(sc, reduction = "pca") 
+
+# use dimheatmap function to generate heatmap of gene expression in first 20 PCs
+DimHeatmap(sc, dims = 1:20, cells = 500, balanced = TRUE)
+
+# generate an elbow plot
+elbowplotsc <- ElbowPlot(sc)
+elbowplotsc
+
+# findneighbours function represent cell-cell based similarities based on PCs
+sc <- FindNeighbors(sc, dims = 1:17)
+# findclusters function represent cell-cell based similarities based on the previous step, grouping cells into clusters
+sc <- FindClusters(sc, resolution = 0.5)
+
+# use runUMAP function to perform UMAP analysis
+sc <- RunUMAP(sc, dims = 1:17)
+
+# use dimplot function to visualise the cell clusters
+plot <- DimPlot(sc, reduction = "umap", label = TRUE)
+plot
+
+#define the cluster based on biomarkers using FindAllMarkers
+sc.markers <- FindAllMarkers(sc, only.pos = TRUE)
+sc.markers %>%
+    group_by(cluster) %>%
+    dplyr::filter(avg_log2FC > 1)
+
+# use table function to tabulate the amount of genes in each cluster unique to that cluster
+table(sc.markers$cluster)
+
+# use FeaturePlot to visulaise which cells express specific marker genes - this function was ran multiple times with different gene names
+FeaturePlot(sc, features = c("PENK", "TH")) 
+
+# get the top 500 gene markers for each clusters
+top500_markers <- as.data.frame(sc.markers %>% group_by(cluster) %>% top_n(n = 500, wt = avg_log2FC))
+top500_markers 
+
+#extact the tope ten genes from the clusters
+CL5 <- top50_markers[top50_markers$cluster %in% c("5"),]
+
+# make new data frame with gene names only
+gene_of_interest_5 <- CL5$gene
+#make a background list - gonna use the sc marker list as has loads of genes - dont know if this is right tho
+background_list <- sc.markers$gene
+
+#perform the functional enrichment analysis
+goResults5 <- gost(query = gene_of_interest_5, organism = 'hsapiens', 
+                  sources = "GO", significant = TRUE, correction_method = "gSCS", 
+                  user_threshold = 0.05, evcodes = TRUE)
+goResults5
+
+
+
+
+
+
