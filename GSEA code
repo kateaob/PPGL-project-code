@@ -7,13 +7,20 @@ BiocManager::install(organism, character.only = TRUE)
 library(organism, character.only = TRUE)
 
 # edit the format of the DESEQ2 results to make them suitable for the gsea
+# REMOVE NA
+DE_met <- DEresults_tcga_met[!is.na(DEresults_tcga_met$padj),]
+# sort based on p value
+DE_met <- DE_met[DE_met$padj < 0.05,]
 
+# make the row najmes into a column
+rownames_met <- rownames(DE_met)
+DE_met$gene_name <- rownames_met
 # make a new data frame with the log2 Fold Change values
-gsea_met_file <- DEresults_tcga_met$log2FoldChange
+gsea_met_file <- DE_met$log2FoldChange
 gsea_met_file <- as.data.frame(gsea_met_file)
 
 make a data frame containing the gene names
-gsea_met_gene_names <- rownames(DEresults_tcga_met)
+gsea_met_gene_names <- rownames(DE_met)
 gsea_met_gene_names <- as.data.frame(gsea_met_gene_names)
 
 # combine the new data frames for use in the gsea
