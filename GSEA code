@@ -41,7 +41,7 @@ gse_met <- gseGO(geneList=gene_list_met,
              pvalueCutoff = 0.05, 
              verbose = TRUE, 
              OrgDb = organism, 
-             pAdjustMethod = "none")
+             pAdjustMethod = "BH")
 
 # plot the results from the gsea in the form  of a dotplot
 require(DOSE)
@@ -83,7 +83,7 @@ kk2_met <- gseKEGG(geneList     = kegg_gene_list_met,
                minGSSize    = 3,
                maxGSSize    = 800,
                pvalueCutoff = 0.05,
-               pAdjustMethod = "none",
+               pAdjustMethod = "BH",
                keyType       = "ncbi-geneid")
 
 # plot the results from the gsea in the form  of a dotplot
