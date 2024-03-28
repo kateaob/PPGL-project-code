@@ -24,7 +24,6 @@ corr_plot <- ggplot(mean_corr, aes(x=fresh_samples, y=ffpe_samples)) +
   theme(axis.title.y=element_text(margin=margin(0,10,0,0))) +  
   theme(axis.title.x=element_text(margin=margin(10,0,0,0))) +
   geom_point(shape=1, alpha =0.3) +theme_bw() + 
-  geom_smooth(method=lm, formula = y~x) + # add line of best fit
   stat_cor(method = "pearson") # add the pearson correlation coefficient
 corr_plot
 
@@ -45,7 +44,7 @@ corr_plot_vhl <- ggplot(mean_corr, aes(x=fresh_samples, y=ffpe_samples, label = 
   geom_point(shape=1, alpha =0.3) +theme_bw() +
   stat_cor(method = "pearson") + 
   geom_point(color = "grey") + geom_point(data = mean_corr %>% filter(gene %in% gene_to_highlight), colour = "red") + # hihglight any point in red that is the gene found in the gene_to_highlight object
-  geom_text(data = mean_corr %>% filter( gene %in% gene_to_highlight ), color = "black")  + # add the name of the gene from the gene_to_highlight object
-  geom_smooth(method=lm, formula = y~x)
+  geom_text(data = mean_corr %>% filter( gene %in% gene_to_highlight ), color = "black")  # add the name of the gene from the gene_to_highlight object
+  
 
 corr_plot_vhl
