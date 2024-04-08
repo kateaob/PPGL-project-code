@@ -16,27 +16,8 @@ sc[["percent.mt"]] <- PercentageFeatureSet(sc, pattern = "^MT-")
 qcPlots <- VlnPlot(sc, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
 qcPlots
 
-# Get filtering parameters, filter any cells with features or counts which are above or below 2 times the SD of the mean
-count.max <- round(mean(sc$nCount_RNA) + 2 * sd(sc$nCount_RNA), digits = -2)
-count.min <- round(mean(sc$nCount_RNA) - 2 * sd(sc$nCount_RNA), digits = -2)
-feat.max <- round(mean(sc$nFeature_RNA) + 2 * sd(sc$nFeature_RNA), digits = -2)
-feat.min <- round(mean(sc$nFeature_RNA) - 2 * sd(sc$nFeature_RNA), digits = -2)
-
-# Set minimum parameters to 0 if negative value
-if (count.min < 0){
-   count.min <- 0
-} else {
-   count.min <- count.min
-}
-  
-if (feat.min < 0){
-   feat.min <- 0
-} else {
-   feat.min <- feat.min
-}
-
 # filter the data set using the defined parameters
-sc_filtered <- subset(sc, subset = nFeature_RNA > feat.min & nFeature_RNA < feat.max & nCount_RNA < count.max & nCount_RNA > count.min & percent.mt < 10)
+sc_filtered <- subset(sc, subset = nFeature_RNA > 200 & nFeature_RNA < 5000 & percent.mt < 10)
 
 #normalise the data
 sc_filtered <- NormalizeData(sc_filtered, normalization.method = "LogNormalize", scale.factor = 10000)
